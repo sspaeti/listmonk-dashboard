@@ -1,0 +1,98 @@
+version: 1
+type: metrics_view
+
+display_name: Campaign Impact
+description: Per campaign, for all campaigns. Unsubscribes and blocklistings within the attribution window after the send, bounces by type.
+model: campaign_impact
+timeseries: started_at
+
+dimensions:
+  - name: campaign_label
+    display_name: Campaign
+    column: campaign_label
+  - name: subject
+    column: subject
+  - name: is_latest
+    display_name: Latest campaign
+    column: is_latest
+  - name: list_names
+    display_name: Lists
+    column: list_names
+    unnest: true
+  - name: tags
+    column: tags
+    unnest: true
+
+measures:
+  - name: campaigns
+    expression: COUNT(*)
+    format_d3: ",.0f"
+  - name: sent
+    expression: SUM(sent)
+    format_d3: ",.0f"
+  - name: unsubscribes
+    display_name: Unsubscribes (after send)
+    description: Distinct subscribers who unsubscribed from a targeted list within the attribution window after the send.
+    expression: SUM(unsubscribes)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: unsubscribe_rate
+    expression: SUM(unsubscribes) / NULLIF(SUM(sent), 0)
+    format_d3: ".2%"
+    valid_percent_of_total: false
+    lower_is_better: true
+  - name: bounces
+    expression: SUM(bounces)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: hard_bounces
+    expression: SUM(hard_bounces)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: soft_bounces
+    expression: SUM(soft_bounces)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: complaints
+    expression: SUM(complaints)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: bounce_rate
+    expression: SUM(bounces) / NULLIF(SUM(sent), 0)
+    format_d3: ".2%"
+    valid_percent_of_total: false
+    lower_is_better: true
+  - name: hard_bounce_rate
+    expression: SUM(hard_bounces) / NULLIF(SUM(sent), 0)
+    format_d3: ".2%"
+    valid_percent_of_total: false
+    lower_is_better: true
+  - name: blocklisted
+    display_name: Blocklisted (hard bounce / complaint on this send)
+    expression: SUM(blocklisted)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: list_loss
+    display_name: List loss (unsubscribes + blocklisted)
+    expression: SUM(list_loss)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: list_loss_rate
+    expression: SUM(list_loss) / NULLIF(SUM(sent), 0)
+    format_d3: ".2%"
+    valid_percent_of_total: false
+    lower_is_better: true
+
+explore:
+  display_name: Campaign Impact
+  defaults:
+    time_range: inf
+    measures:
+      - sent
+      - unsubscribes
+      - unsubscribe_rate
+      - hard_bounces
+      - bounce_rate
+    dimensions:
+      - campaign_label
+      - list_names

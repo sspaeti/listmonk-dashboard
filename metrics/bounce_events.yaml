@@ -1,0 +1,40 @@
+version: 1
+type: metrics_view
+
+display_name: Bounces
+description: Bounce events over time by type, source and campaign.
+model: bounce_events
+timeseries: bounced_at
+
+dimensions:
+  - name: type
+    column: type
+  - name: source
+    column: source
+  - name: campaign_label
+    display_name: Campaign
+    column: campaign_label
+  - name: subscriber_status_now
+    display_name: Subscriber status now
+    column: subscriber_status_now
+
+measures:
+  - name: bounces
+    expression: COUNT(*)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: bounced_subscribers
+    expression: COUNT(DISTINCT subscriber_id)
+    format_d3: ",.0f"
+    lower_is_better: true
+
+explore:
+  display_name: Bounces
+  defaults:
+    time_range: inf
+    measures:
+      - bounces
+    dimensions:
+      - type
+      - source
+      - campaign_label

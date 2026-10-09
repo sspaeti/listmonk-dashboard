@@ -1,0 +1,58 @@
+# One row per sent regular campaign: did this issue hurt the list? Unsubscribes and blocklistings
+# within impact_window_days after the send (on the lists the campaign went to), blocklistings caused
+# by its hard bounces/complaints, and bounces by type.
+# Works for every campaign, not only those with open tracking.
+type: model
+materialize: true
+
+sql: |
+  WITH unsubs AS (
+    SELECT attributed_campaign_id AS campaign_id,
+           count(DISTINCT subscriber_id) AS unsubscribes
+    FROM {{ ref "unsubscribe_events" }}
+    WHERE attributed_campaign_id IS NOT NULL
+    GROUP BY 1
+  ),
+  bl AS (
+    -- subscribers blocklisted because of this campaign: a hard bounce or complaint on it, and the
+    -- subscriber is blocklisted now (listmonk blocklists on the first hard bounce/complaint but does
+    -- not touch subscribers.updated_at, so the bounce record is the reliable trail)
+    SELECT b.campaign_id, count(DISTINCT b.subscriber_id) AS blocklisted
+    FROM {{ ref "pg_bounces" }} b
+    JOIN {{ ref "pg_subscribers" }} s ON s.id = b.subscriber_id AND s.status = 'blocklisted'
+    WHERE b.type IN ('hard', 'complaint')
+    GROUP BY 1
+  ),
+  b AS (
+    SELECT campaign_id,
+           count(*) AS bounces,
+           count(*) FILTER (WHERE type = 'hard')      AS hard_bounces,
+           count(*) FILTER (WHERE type = 'soft')      AS soft_bounces,
+           count(*) FILTER (WHERE type = 'complaint') AS complaints,
+           count(DISTINCT subscriber_id)              AS bounced_subscribers
+    FROM {{ ref "pg_bounces" }}
+    GROUP BY 1
+  ),
+  base AS (
+    SELECT
+      c.campaign_id, c.campaign_label, c.subject, c.started_at, c.list_names, c.tags, c.sent, c.is_latest,
+      coalesce(u.unsubscribes, 0)       AS unsubscribes,
+      coalesce(bl.blocklisted, 0)       AS blocklisted,
+      coalesce(b.bounces, 0)            AS bounces,
+      coalesce(b.hard_bounces, 0)       AS hard_bounces,
+      coalesce(b.soft_bounces, 0)       AS soft_bounces,
+      coalesce(b.complaints, 0)         AS complaints,
+      coalesce(b.bounced_subscribers, 0) AS bounced_subscribers
+    FROM {{ ref "sent_campaigns" }} c
+    LEFT JOIN unsubs u ON u.campaign_id = c.campaign_id
+    LEFT JOIN bl      ON bl.campaign_id = c.campaign_id
+    LEFT JOIN b       ON b.campaign_id  = c.campaign_id
+  )
+  SELECT *,
+    unsubscribes / sent                AS unsubscribe_rate,
+    bounces / sent                     AS bounce_rate,
+    hard_bounces / sent                AS hard_bounce_rate,
+    -- hard bounces are not added separately: they are what causes the blocklisting
+    (unsubscribes + blocklisted) AS list_loss,
+    (unsubscribes + blocklisted) / sent AS list_loss_rate
+  FROM base

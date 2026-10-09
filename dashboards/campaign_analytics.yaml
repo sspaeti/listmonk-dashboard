@@ -1,0 +1,212 @@
+type: canvas
+display_name: Campaign Analytics (tracked only)
+max_width: 1400
+
+# Only campaigns with per-subscriber open events. The filter is applied to every component and is
+# visible (and removable) in the filter bar at the top.
+filters:
+  enable: true
+  pinned:
+    - tracking_status
+    - campaign_label
+
+defaults:
+  time_range: inf
+  comparison_mode: none
+  filters:
+    campaign_summary: "tracking_status = 'tracked'"
+
+rows:
+  - height: 70px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            # Campaign analytics
+
+            Only campaigns with open tracking enabled. Open rate = unique openers / sent (what Substack and Mailchimp call "opened %"). *Excl. early* removes openers whose every view came within 2 minutes of the send start (prefetchers or instant opens): a lower bound.
+          alignment:
+            horizontal: left
+            vertical: middle
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Latest tracked campaign"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 150px
+    items:
+      - width: 12
+        kpi_grid:
+          metrics_view: campaign_summary
+          dimension_filters: is_latest_tracked = 'yes'
+          hide_time_range: true
+          measures:
+            - sent
+            - unique_openers
+            - open_rate
+            - open_rate_excl_early
+            - early_share
+            - views_per_opener
+            - bounces
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## All tracked campaigns"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 300px
+    items:
+      - width: 12
+        table:
+          metrics_view: campaign_summary
+          title: "Tracked campaigns"
+          description: "Click a column header to sort."
+          columns:
+            - campaign_label
+            - sent
+            - api_views
+            - unique_openers
+            - early_openers
+            - open_rate
+            - open_rate_excl_early
+            - views_per_opener
+            - unique_clickers
+            - ctor
+            - bounces
+            - median_minutes_to_first_open
+          hide_totals_row: false
+
+  - height: 400px
+    items:
+      - width: 6
+        line_chart:
+          metrics_view: campaign_summary
+          title: "Open rate vs open rate excl. early opens"
+          color:
+            field: rill_measures
+            type: value
+            legendOrientation: top
+          x:
+            field: started_at
+            type: temporal
+          y:
+            field: open_rate
+            fields:
+              - open_rate
+              - open_rate_excl_early
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        stacked_bar_normalized:
+          metrics_view: campaign_summary
+          title: "When do people first open? (share of openers)"
+          color:
+            field: rill_measures
+            type: value
+            legendOrientation: top
+          x:
+            field: campaign_label
+            type: nominal
+            limit: 20
+            sort: x
+          y:
+            field: first_open_0_2m
+            fields:
+              - first_open_0_2m
+              - first_open_2_10m
+              - first_open_10_60m
+              - first_open_1_24h
+              - first_open_24h_plus
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Time to first open"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 380px
+    items:
+      - width: 6
+        bar_chart:
+          metrics_view: subscriber_campaign
+          title: "First opens per minute after send start (first hour)"
+          description: "The ramp over the first ~10 minutes is the send itself (~5 mails/s)."
+          color:
+            field: campaign_label
+            type: nominal
+            limit: 6
+            legendOrientation: top
+          x:
+            field: first_open_minute
+            type: nominal
+            limit: 62
+            sort: x
+          y:
+            field: openers
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        bar_chart:
+          metrics_view: subscriber_campaign
+          title: "First opens per hour after send start (first two days)"
+          color:
+            field: campaign_label
+            type: nominal
+            limit: 6
+            legendOrientation: top
+          x:
+            field: first_open_hour
+            type: nominal
+            limit: 50
+            sort: x
+          y:
+            field: openers
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 380px
+    items:
+      - width: 6
+        line_chart:
+          metrics_view: daily_activity
+          title: "Daily first opens per campaign (listmonk's Analytics-page view)"
+          dimension_filters: type = 'first_opens' AND source = 'raw_db'
+          color:
+            field: campaign_label
+            type: nominal
+            limit: 6
+            legendOrientation: top
+          x:
+            field: day
+            type: temporal
+          y:
+            field: total
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        leaderboard:
+          metrics_view: subscriber_campaign
+          title: "Openers by campaign and kind"
+          dimensions:
+            - campaign_label
+            - opener_kind
+            - first_open_bucket
+          measures:
+            - openers
+            - views_per_opener
+            - median_minutes_to_first_open
+          num_rows: 8

@@ -1,0 +1,19 @@
+# One row per (subscriber, list) membership with subscription status, subscriber status and when the
+# subscription was created. Powers list sizes and subscriber growth. No personal data.
+type: model
+materialize: true
+
+sql: |
+  SELECT
+    sl.subscriber_id,
+    l.id   AS list_id,
+    l.name AS list_name,
+    l.type AS list_type,
+    l.optin,
+    sl.status AS subscription_status,
+    s.status  AS subscriber_status,
+    sl.created_at AS subscribed_at,
+    sl.updated_at AS status_changed_at
+  FROM pg_subscriber_lists sl
+  JOIN pg_lists l ON l.id = sl.list_id
+  JOIN pg_subscribers s ON s.id = sl.subscriber_id

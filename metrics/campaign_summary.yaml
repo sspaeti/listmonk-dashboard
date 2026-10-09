@@ -1,0 +1,216 @@
+version: 1
+type: metrics_view
+
+display_name: Campaign Summary
+description: One row per sent campaign. Listmonk's reported totals next to raw-event numbers, unique openers, early vs later openers and rates comparable to other newsletter tools.
+model: campaign_summary
+timeseries: started_at
+
+dimensions:
+  - name: campaign_label
+    display_name: Campaign
+    column: campaign_label
+  - name: subject
+    column: subject
+  - name: listmonk_name
+    display_name: Listmonk campaign name
+    column: listmonk_name
+  - name: campaign_id
+    expression: campaign_id::VARCHAR
+  - name: status
+    column: status
+  - name: campaign_type
+    column: type
+  - name: tracking_status
+    display_name: Tracking
+    description: "tracked = per-subscriber opens exist; unique n/a = views exist but individual tracking was off; no tracking data = no view events at all"
+    column: tracking_status
+  - name: is_latest
+    display_name: Latest campaign
+    column: is_latest
+  - name: is_latest_tracked
+    display_name: Latest tracked campaign
+    column: is_latest_tracked
+  - name: list_names
+    display_name: Lists
+    column: list_names
+    unnest: true
+  - name: tags
+    column: tags
+    unnest: true
+
+measures:
+  - name: campaigns
+    expression: COUNT(*)
+    format_d3: ",.0f"
+  - name: tracked_campaigns
+    expression: COUNT(*) FILTER (WHERE tracking_status = 'tracked')
+    format_d3: ",.0f"
+  - name: sent
+    expression: SUM(sent)
+    format_d3: ",.0f"
+  - name: api_views
+    display_name: Views (listmonk)
+    description: The views number listmonk shows in its campaign list (all pixel loads).
+    expression: SUM(api_views)
+    format_d3: ",.0f"
+  - name: total_views
+    display_name: Views (raw events)
+    expression: SUM(total_views)
+    format_d3: ",.0f"
+  - name: anonymous_views
+    description: Views without a subscriber id (individual tracking off).
+    expression: SUM(anonymous_views)
+    format_d3: ",.0f"
+  - name: unique_openers
+    expression: SUM(unique_openers)
+    format_d3: ",.0f"
+  - name: early_openers
+    display_name: Early openers (≤ early window)
+    description: Openers whose every view fell within early_min minutes of campaign start. Prefetchers (Apple MPP, scanners) or people reacting to a notification; a sensitivity band, not bot detection.
+    expression: SUM(early_openers)
+    format_d3: ",.0f"
+  - name: later_openers
+    display_name: Later openers
+    expression: SUM(later_openers)
+    format_d3: ",.0f"
+  - name: unique_clickers
+    expression: SUM(unique_clickers)
+    format_d3: ",.0f"
+  - name: total_clicks
+    expression: SUM(total_clicks)
+    format_d3: ",.0f"
+  - name: bounces
+    expression: SUM(bounces)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: hard_bounces
+    expression: SUM(hard_bounces)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: open_rate
+    display_name: Open rate
+    description: unique openers / sent. the "opened %" other newsletter tools report. Only campaigns with tracking data count.
+    expression: SUM(unique_openers) / NULLIF(SUM(sent) FILTER (WHERE tracking_status = 'tracked'), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: open_rate_excl_early
+    display_name: Open rate excl. early opens
+    description: (unique openers − early openers) / sent. Lower bound if every early opener were a prefetcher.
+    expression: SUM(later_openers) / NULLIF(SUM(sent) FILTER (WHERE tracking_status = 'tracked'), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: early_share
+    display_name: Early share of openers
+    expression: SUM(early_openers) / NULLIF(SUM(unique_openers), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+    lower_is_better: true
+  - name: click_rate
+    display_name: Click rate
+    description: unique clickers / sent
+    expression: SUM(unique_clickers) / NULLIF(SUM(sent) FILTER (WHERE tracking_status = 'tracked'), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: ctor
+    display_name: CTOR
+    description: Click-to-open rate = unique clickers / unique openers
+    expression: SUM(unique_clickers) / NULLIF(SUM(unique_openers), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: views_per_opener
+    expression: SUM(total_views) / NULLIF(SUM(unique_openers), 0)
+    format_d3: ".2f"
+    valid_percent_of_total: false
+  - name: bounce_rate
+    expression: SUM(bounces) / NULLIF(SUM(sent), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+    lower_is_better: true
+  - name: median_minutes_to_first_open
+    display_name: Median minutes to first open
+    expression: QUANTILE_CONT(median_minutes_to_first_open, 0.5)
+    format_d3: ",.0f"
+    valid_percent_of_total: false
+  - name: first_open_0_2m
+    display_name: First open 0-2 min
+    expression: SUM(first_open_0_2m)
+    format_d3: ",.0f"
+  - name: first_open_2_10m
+    display_name: First open 2-10 min
+    expression: SUM(first_open_2_10m)
+    format_d3: ",.0f"
+  - name: first_open_10_60m
+    display_name: First open 10-60 min
+    expression: SUM(first_open_10_60m)
+    format_d3: ",.0f"
+  - name: first_open_1_24h
+    display_name: First open 1-24 h
+    expression: SUM(first_open_1_24h)
+    format_d3: ",.0f"
+  - name: first_open_24h_plus
+    display_name: First open > 24 h
+    expression: SUM(first_open_24h_plus)
+    format_d3: ",.0f"
+  - name: share_0_2m
+    display_name: Share 0-2 min
+    expression: SUM(first_open_0_2m) / NULLIF(SUM(unique_openers), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: share_2_10m
+    display_name: Share 2-10 min
+    expression: SUM(first_open_2_10m) / NULLIF(SUM(unique_openers), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: share_10_60m
+    display_name: Share 10-60 min
+    expression: SUM(first_open_10_60m) / NULLIF(SUM(unique_openers), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: share_1_24h
+    display_name: Share 1-24 h
+    expression: SUM(first_open_1_24h) / NULLIF(SUM(unique_openers), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: share_24h_plus
+    display_name: Share > 24 h
+    expression: SUM(first_open_24h_plus) / NULLIF(SUM(unique_openers), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: api_daily_views_sum
+    display_name: Analytics-page views (listmonk, daily sum)
+    description: Sum of listmonk's daily analytics chart. Listmonk counts each subscriber once, on their first-open day.
+    expression: SUM(api_daily_views_sum)
+    format_d3: ",.0f"
+  - name: raw_first_opens_sum
+    display_name: First opens (raw, incl. anonymous)
+    description: Subscribers counted once on their first-open day, plus one group for views without subscriber id. Reproduces listmonk's Analytics-page number.
+    expression: SUM(raw_first_opens_sum)
+    format_d3: ",.0f"
+  - name: api_clicks
+    display_name: Clicks (listmonk)
+    expression: SUM(api_clicks)
+    format_d3: ",.0f"
+  - name: api_bounces
+    display_name: Bounces (listmonk)
+    expression: SUM(api_bounces)
+    format_d3: ",.0f"
+
+explore:
+  display_name: Campaigns
+  defaults:
+    time_range: inf
+    measures:
+      - sent
+      - api_views
+      - unique_openers
+      - open_rate
+      - open_rate_excl_early
+      - unique_clickers
+      - ctor
+      - bounces
+    dimensions:
+      - campaign_label
+      - tracking_status
+      - list_names
+      - tags

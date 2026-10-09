@@ -1,0 +1,37 @@
+# One row per unsubscribed list membership, with the campaign it is attributed to: the most recent
+# campaign sent to that list within impact_window_days before the unsubscribe. Otherwise 'organic'.
+# status_changed_at is subscriber_lists.updated_at, i.e. the time the status became 'unsubscribed'.
+type: model
+materialize: true
+
+sql: |
+  WITH u AS (
+    SELECT subscriber_id, list_id, list_name, status_changed_at AS unsubscribed_at, subscribed_at
+    FROM {{ ref "subscriptions" }}
+    WHERE subscription_status = 'unsubscribed' AND status_changed_at IS NOT NULL
+  ),
+  candidates AS (
+    SELECT
+      u.*,
+      c.campaign_id, c.campaign_label, c.started_at,
+      row_number() OVER (PARTITION BY u.subscriber_id, u.list_id ORDER BY c.started_at DESC) AS rn
+    FROM u
+    JOIN {{ ref "pg_campaign_lists" }} cl ON cl.list_id = u.list_id
+    JOIN {{ ref "sent_campaigns" }} c ON c.campaign_id = cl.campaign_id
+     AND u.unsubscribed_at >= c.started_at
+     AND u.unsubscribed_at <  c.started_at + INTERVAL {{ .env.impact_window_days }} DAY
+  )
+  SELECT
+    u.subscriber_id,
+    u.list_id,
+    u.list_name,
+    u.subscribed_at,
+    u.unsubscribed_at,
+    date_diff('day', u.subscribed_at, u.unsubscribed_at) AS days_subscribed,
+    CASE WHEN c.campaign_id IS NULL THEN 'organic' ELSE 'after campaign' END AS attribution,
+    c.campaign_id AS attributed_campaign_id,
+    coalesce(c.campaign_label, 'organic / unknown') AS attributed_campaign_label,
+    date_diff('hour', c.started_at, u.unsubscribed_at) AS hours_after_send
+  FROM u
+  LEFT JOIN candidates c
+    ON c.subscriber_id = u.subscriber_id AND c.list_id = u.list_id AND c.rn = 1

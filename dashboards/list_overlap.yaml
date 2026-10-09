@@ -1,0 +1,174 @@
+type: canvas
+display_name: List Overlap (list A vs list B)
+max_width: 1400
+
+filters:
+  enable: true
+  pinned:
+    - segment
+
+defaults:
+  time_range: inf
+  comparison_mode: none
+
+rows:
+  - height: 80px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            # List A vs list B
+
+            Compares two lists (ids `list_a_id` / `list_b_id` in `rill.yaml`). "In a list" = confirmed subscription and subscriber enabled. Typical use: list A is your main newsletter, list B a product/book list, and you want everyone on B to also be on A, except people who unsubscribed from A.
+          alignment:
+            horizontal: left
+            vertical: middle
+
+  - height: 150px
+    items:
+      - width: 12
+        kpi_grid:
+          metrics_view: subscriber_segments
+          hide_time_range: true
+          measures:
+            - in_list_a
+            - in_list_b
+            - in_both
+            - list_a_only
+            - list_b_only
+            - list_b_share_in_list_a
+
+  - height: 150px
+    items:
+      - width: 12
+        kpi_grid:
+          metrics_view: subscriber_segments
+          hide_time_range: true
+          measures:
+            - list_a_candidates
+            - list_b_only_unsubscribed_list_a
+            - list_a_share_in_list_b
+
+  - height: 380px
+    items:
+      - width: 5
+        donut_chart:
+          metrics_view: subscriber_segments
+          title: "Current segments"
+          innerRadius: 50
+          color:
+            field: segment
+            type: nominal
+            limit: 6
+            sort: -measure
+          measure:
+            field: subscribers
+            type: quantitative
+            showTotal: true
+      - width: 7
+        pivot:
+          metrics_view: subscriber_segments
+          title: "Why is someone not in both? List A status × List B status"
+          description: "Rows: status on list A. Columns: status on list B. 'not on list' = never added."
+          row_dimensions:
+            - list_a_status
+          col_dimensions:
+            - list_b_status
+          measures:
+            - subscribers
+          hide_totals_row: false
+          hide_totals_col: false
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Over time"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 400px
+    items:
+      - width: 6
+        area_chart:
+          metrics_view: segment_timeline
+          title: "Subscribers per segment at month end"
+          description: "Active subscriptions as of each month end. Unsubscribes are back-dated via their last status change."
+          color:
+            field: segment
+            type: nominal
+            limit: 4
+            legendOrientation: top
+          x:
+            field: month
+            type: temporal
+          y:
+            field: subscribers
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        stacked_bar:
+          metrics_view: subscriber_segments
+          title: "Current segment by month of first subscription"
+          description: "Cohorts: where did people who joined in a given month end up today?"
+          time_filters: tr=inf&grain=month
+          color:
+            field: segment
+            type: nominal
+            limit: 6
+            legendOrientation: top
+          x:
+            field: first_subscribed_at
+            type: temporal
+          y:
+            field: subscribers
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 400px
+    items:
+      - width: 6
+        line_chart:
+          metrics_view: segment_timeline
+          title: "List B only over time"
+          dimension_filters: segment = 'List B only'
+          color: primary
+          x:
+            field: month
+            type: temporal
+          y:
+            field: subscribers
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        line_chart:
+          metrics_view: segment_timeline
+          title: "Both lists over time"
+          dimension_filters: segment = 'Both lists'
+          color: primary
+          x:
+            field: month
+            type: temporal
+          y:
+            field: subscribers
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 200px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            ### How to add the candidates in listmonk
+
+            Subscribers → Advanced query, paste the query below with your list ids (B = source list, A = target list), select all → Manage lists → Add to list A. It matches enabled subscribers confirmed on list B who were **never** on list A, so opt-outs stay out.
+
+            ```
+            subscribers.status = 'enabled'
+            AND EXISTS (SELECT 1 FROM subscriber_lists sl WHERE sl.subscriber_id = subscribers.id AND sl.list_id = LIST_B_ID AND sl.status = 'confirmed')
+            AND NOT EXISTS (SELECT 1 FROM subscriber_lists sl WHERE sl.subscriber_id = subscribers.id AND sl.list_id = LIST_A_ID)
+            ```
+          alignment:
+            horizontal: left
+            vertical: top

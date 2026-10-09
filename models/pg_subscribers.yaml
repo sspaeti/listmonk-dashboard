@@ -1,0 +1,11 @@
+# Subscribers WITHOUT personal data: no email, name or attribs are loaded.
+type: model
+materialize: true
+
+refresh:
+  cron: "0 6 * * *"
+
+pre_exec: ATTACH IF NOT EXISTS 'host={{ .env.LISTMONK_PG_HOST }} port={{ .env.LISTMONK_PORT }} dbname={{ .env.LISTMONK_DATABASE }} user={{ .env.LISTMONK_USER }} password={{ .env.LISTMONK_PGPASSWORD }}' AS lm (TYPE postgres, READ_ONLY)
+sql: |
+  SELECT id, status::VARCHAR AS status, created_at::TIMESTAMP AS created_at, updated_at::TIMESTAMP AS updated_at
+  FROM lm.public.subscribers

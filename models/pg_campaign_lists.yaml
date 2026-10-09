@@ -1,0 +1,11 @@
+# Which lists each campaign was sent to.
+type: model
+materialize: true
+
+refresh:
+  cron: "0 6 * * *"
+
+pre_exec: ATTACH IF NOT EXISTS 'host={{ .env.LISTMONK_PG_HOST }} port={{ .env.LISTMONK_PORT }} dbname={{ .env.LISTMONK_DATABASE }} user={{ .env.LISTMONK_USER }} password={{ .env.LISTMONK_PGPASSWORD }}' AS lm (TYPE postgres, READ_ONLY)
+sql: |
+  SELECT campaign_id, list_id, list_name
+  FROM lm.public.campaign_lists

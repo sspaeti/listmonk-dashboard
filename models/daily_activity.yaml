@@ -1,0 +1,36 @@
+# Long table (campaign, day, type, source, count).
+#   source = 'listmonk_api' : what listmonk's Analytics page shows (types: views, clicks, bounces)
+#   source = 'raw_db'       : computed from raw events (types: views, first_opens, clicks, bounces)
+#   'first_opens' = each subscriber once on their first-open day (+ one group for anonymous views);
+#   this is exactly what listmonk's Analytics page charts as 'views'.
+type: model
+materialize: true
+
+sql: |
+  WITH long AS (
+    SELECT campaign_id, day, type, 'listmonk_api' AS source, count
+    FROM api_daily_activity
+    UNION ALL
+    SELECT campaign_id, date_trunc('day', created_at), 'views', 'raw_db', count(*)
+    FROM pg_campaign_views GROUP BY ALL
+    UNION ALL
+    SELECT campaign_id, date_trunc('day', first_view), 'first_opens', 'raw_db', count(*)
+    FROM (SELECT campaign_id, subscriber_id, min(created_at) AS first_view FROM pg_campaign_views GROUP BY 1, 2)
+    GROUP BY ALL
+    UNION ALL
+    SELECT campaign_id, date_trunc('day', created_at), 'clicks', 'raw_db', count(*)
+    FROM pg_link_clicks GROUP BY ALL
+    UNION ALL
+    SELECT campaign_id, date_trunc('day', created_at), 'bounces', 'raw_db', count(*)
+    FROM pg_bounces WHERE campaign_id IS NOT NULL GROUP BY ALL
+  )
+  SELECT
+    l.campaign_id,
+    c.subject AS campaign_name,
+    c.campaign_label,
+    l.day,
+    l.type,
+    l.source,
+    l.count
+  FROM long l
+  LEFT JOIN sent_campaigns c ON c.campaign_id = l.campaign_id

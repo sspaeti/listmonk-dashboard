@@ -1,0 +1,7 @@
+type: connector
+driver: duckdb
+
+# Postgres extension lets models read the listmonk database directly (see models/pg_*.yaml).
+init_sql: |
+  INSTALL postgres;
+  LOAD postgres;

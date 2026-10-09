@@ -1,0 +1,159 @@
+type: canvas
+display_name: Newsletter Health (overview)
+max_width: 1400
+
+filters:
+  enable: true
+  pinned:
+    - tracking_status
+
+defaults:
+  time_range: inf
+  comparison_mode: none
+
+rows:
+  - height: 70px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            # Newsletter health
+
+            Overview across all regular campaigns and lists, read live from listmonk's Postgres. Open rates exist only for campaigns with open tracking, see **Campaign Analytics**. Lists and growth are in **Lists & Subscribers**.
+          alignment:
+            horizontal: left
+            vertical: middle
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Latest campaign"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 150px
+    items:
+      - width: 12
+        kpi_grid:
+          metrics_view: campaign_summary
+          dimension_filters: is_latest = 'yes'
+          hide_time_range: true
+          measures:
+            - sent
+            - unique_openers
+            - open_rate
+            - open_rate_excl_early
+            - click_rate
+            - bounces
+
+  - height: 150px
+    items:
+      - width: 12
+        kpi_grid:
+          metrics_view: list_health
+          hide_time_range: true
+          measures:
+            - enabled
+            - blocklisted
+            - dead_weight
+            - dead_weight_share
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## All regular campaigns"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 480px
+    items:
+      - width: 12
+        table:
+          metrics_view: campaign_summary
+          title: "All regular campaigns"
+          description: "Opt-in confirmation campaigns are excluded. Rates are blank without open tracking. Use the Tracking filter at the top to narrow the page."
+          columns:
+            - campaign_label
+            - tracking_status
+            - sent
+            - api_views
+            - unique_openers
+            - open_rate
+            - api_clicks
+            - bounces
+            - hard_bounces
+            - bounce_rate
+          hide_totals_row: true
+
+  - height: 380px
+    items:
+      - width: 12
+        stacked_bar:
+          metrics_view: campaign_summary
+          title: "Sent and bounces per campaign"
+          color:
+            field: rill_measures
+            type: value
+            legendOrientation: top
+          x:
+            field: campaign_label
+            type: nominal
+            limit: 60
+            sort: x
+          y:
+            field: sent
+            fields:
+              - sent
+              - bounces
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Reconciliation: listmonk's numbers vs raw events"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 300px
+    items:
+      - width: 12
+        table:
+          metrics_view: campaign_summary
+          title: "Per campaign"
+          description: "Views (listmonk) = campaign list, all pixel loads = Views (raw events). Analytics-page views = daily chart sum, which equals first opens per subscriber (raw)."
+          dimension_filters: tracking_status != 'no tracking data'
+          columns:
+            - campaign_label
+            - api_views
+            - total_views
+            - api_daily_views_sum
+            - raw_first_opens_sum
+            - unique_openers
+            - api_clicks
+            - total_clicks
+            - api_bounces
+            - bounces
+          hide_totals_row: true
+
+  - height: 230px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            ### Known limitations
+
+            - **"Early" is not bot detection.** An early opener had every view within 2 minutes of campaign start. That can be Apple Mail prefetch or a scanner, but also a person opening a notification right away. Listmonk stores no user agent, so the two cannot be separated. Read *open rate excl. early* as a lower bound. `started_at` is also the campaign start, not each recipient's send time (a ~3000-mail send takes ~10 minutes).
+            - **Pixel opens lie in both directions.** Apple Mail Privacy Protection and corporate scanners inflate them; blocked images and spam folders hide real reads. Clicks would be the most trustworthy signal, but click tracking has never recorded an event on this instance.
+            - **Per-subscriber events exist only since 2026-08-06.** Earlier campaigns show listmonk's totals but no unique openers ("no tracking data"), so their rates stay blank rather than 0 %.
+            - **Listmonk's Analytics page counts each subscriber once, on their first-open day;** its campaign list counts every pixel load. Both are shown in the reconciliation table.
+            - **Opt-in confirmation campaigns are excluded** everywhere (campaign type `optin`).
+          alignment:
+            horizontal: left
+            vertical: top

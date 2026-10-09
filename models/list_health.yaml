@@ -1,0 +1,31 @@
+# One snapshot row: subscriber status counts and "dead weight" = enabled subscribers with no
+# open (and, in the strict variant, no click) in the last 10 campaigns that have tracking data.
+type: model
+materialize: true
+
+sql: |
+  WITH tracked AS (
+    SELECT campaign_id FROM campaign_summary
+    WHERE total_views > 0
+    ORDER BY started_at DESC
+    LIMIT 10
+  ),
+  viewed AS (
+    SELECT DISTINCT subscriber_id FROM pg_campaign_views
+    WHERE subscriber_id IS NOT NULL AND campaign_id IN (SELECT campaign_id FROM tracked)
+  ),
+  clicked AS (
+    SELECT DISTINCT subscriber_id FROM pg_link_clicks
+    WHERE subscriber_id IS NOT NULL AND campaign_id IN (SELECT campaign_id FROM tracked)
+  )
+  SELECT
+    now()::TIMESTAMP AS snapshot_at,
+    count(*) AS total_subscribers,
+    count(*) FILTER (WHERE status = 'enabled')     AS enabled,
+    count(*) FILTER (WHERE status = 'disabled')    AS disabled,
+    count(*) FILTER (WHERE status = 'blocklisted') AS blocklisted,
+    count(*) FILTER (WHERE status = 'enabled' AND id NOT IN (SELECT subscriber_id FROM viewed)) AS dead_weight,
+    count(*) FILTER (WHERE status = 'enabled' AND id NOT IN (SELECT subscriber_id FROM viewed)
+                                              AND id NOT IN (SELECT subscriber_id FROM clicked)) AS dead_weight_no_view_no_click,
+    (SELECT count(*) FROM tracked) AS tracked_campaigns_considered
+  FROM pg_subscribers

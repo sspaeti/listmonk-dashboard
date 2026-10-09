@@ -1,0 +1,20 @@
+# Campaign totals as listmonk reports them in its UI/API (views, clicks, bounces).
+# Source: data/campaigns.json written by scripts/fetch.sh.
+type: model
+materialize: true
+
+refresh:
+  cron: "0 6 * * *"
+
+sql: |
+  SELECT
+    id,
+    name,
+    status,
+    started_at::TIMESTAMP AS started_at,
+    sent,
+    to_send,
+    views AS api_views,
+    clicks AS api_clicks,
+    bounces AS api_bounces
+  FROM read_json('data/campaigns.json', auto_detect=true, format='auto')

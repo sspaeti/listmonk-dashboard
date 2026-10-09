@@ -1,0 +1,23 @@
+display_name: Listmonk Dashboard
+description: "Honest newsletter analytics from listmonk's own database: unique openers, open rates, time to open, list health, list overlap, unsubscribes and bounces"
+
+olap_connector: duckdb
+
+# Connection details live in .env: LISTMONK_PG_HOST, LISTMONK_PORT, LISTMONK_USER, LISTMONK_DATABASE,
+# LISTMONK_PGPASSWORD (Postgres) and LM_URL, LM_USER, LM_TOKEN (listmonk API).
+env:
+  # Minutes after campaign start; openers whose every view falls inside this window count as "early".
+  early_min: "2"
+  # Two listmonk list ids compared on the "List Overlap" dashboard (find them under Lists in listmonk)
+  list_a_id: "1"
+  list_b_id: "2"
+  # Days after a send within which unsubscribes/blocklistings are attributed to that campaign
+  impact_window_days: "3"
+
+ignore_paths:
+  - /data
+  - /scripts
+  - /evidence
+
+metrics_views:
+  smallest_time_grain: day

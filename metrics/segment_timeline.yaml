@@ -1,0 +1,20 @@
+version: 1
+type: metrics_view
+
+display_name: Segment Timeline
+description: Month-end count of subscribers per list-overlap segment.
+model: segment_timeline
+timeseries: month
+smallest_time_grain: month
+
+dimensions:
+  - name: segment
+    column: segment
+
+measures:
+  - name: subscribers
+    expression: SUM(subscribers)
+    format_d3: ",.0f"
+
+explore:
+  skip: true

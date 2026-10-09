@@ -1,0 +1,17 @@
+# Daily views/clicks/bounces per campaign exactly as listmonk's Analytics page charts them.
+# Source: data/daily_*.json written by scripts/fetch.sh.
+type: model
+materialize: true
+
+refresh:
+  cron: "0 6 * * *"
+
+sql: |
+  SELECT campaign_id, "timestamp"::TIMESTAMP AS day, 'views' AS type, count
+  FROM read_json('data/daily_views.json', format='array', columns={campaign_id: 'INTEGER', count: 'BIGINT', timestamp: 'VARCHAR'})
+  UNION ALL
+  SELECT campaign_id, "timestamp"::TIMESTAMP, 'clicks', count
+  FROM read_json('data/daily_clicks.json', format='array', columns={campaign_id: 'INTEGER', count: 'BIGINT', timestamp: 'VARCHAR'})
+  UNION ALL
+  SELECT campaign_id, "timestamp"::TIMESTAMP, 'bounces', count
+  FROM read_json('data/daily_bounces.json', format='array', columns={campaign_id: 'INTEGER', count: 'BIGINT', timestamp: 'VARCHAR'})

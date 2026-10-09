@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "rill-developer": {
+      "type": "http",
+      "url": "http://localhost:9009/mcp"
+    }
+  }
+}

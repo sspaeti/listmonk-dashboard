@@ -1,0 +1,39 @@
+version: 1
+type: metrics_view
+
+display_name: Daily Activity
+description: Daily views, clicks and bounces per campaign. Compare listmonk's Analytics-page numbers (source listmonk_api) with raw events (source raw_db).
+model: daily_activity
+timeseries: day
+
+dimensions:
+  - name: campaign_label
+    display_name: Campaign
+    column: campaign_label
+  - name: campaign_name
+    column: campaign_name
+  - name: campaign_id
+    expression: campaign_id::VARCHAR
+  - name: type
+    display_name: Event type
+    column: type
+  - name: source
+    description: listmonk_api = analytics endpoint; raw_db = computed from the Postgres event tables
+    column: source
+
+measures:
+  - name: total
+    display_name: Count
+    expression: SUM(count)
+    format_d3: ",.0f"
+
+explore:
+  display_name: Daily Activity
+  defaults:
+    time_range: inf
+    measures:
+      - total
+    dimensions:
+      - type
+      - source
+      - campaign_label

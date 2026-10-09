@@ -1,0 +1,17 @@
+# Bounce events with campaign label and the subscriber's current status (blocklisted after hard bounces).
+type: model
+materialize: true
+
+sql: |
+  SELECT
+    b.id,
+    b.subscriber_id,
+    b.campaign_id,
+    coalesce(c.campaign_label, 'no campaign') AS campaign_label,
+    b.type,
+    b.source,
+    b.created_at AS bounced_at,
+    s.status AS subscriber_status_now
+  FROM pg_bounces b
+  LEFT JOIN sent_campaigns c ON c.campaign_id = b.campaign_id
+  LEFT JOIN pg_subscribers s ON s.id = b.subscriber_id

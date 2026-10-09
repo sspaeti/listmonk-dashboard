@@ -1,0 +1,80 @@
+version: 1
+type: metrics_view
+
+display_name: Subscriber Segments
+description: Current membership in list A and list B per subscriber, by first-subscription date.
+model: subscriber_segments
+timeseries: first_subscribed_at
+
+dimensions:
+  - name: segment
+    column: segment
+  - name: list_a_status
+    display_name: List A status
+    column: list_a_status
+  - name: list_b_status
+    display_name: List B status
+    column: list_b_status
+  - name: subscriber_status
+    column: subscriber_status
+  - name: list_a_candidate
+    display_name: Could be added to list A
+    description: In list B, enabled, and never on list A (so not an opt-out)
+    expression: CASE WHEN list_a_candidate THEN 'yes' ELSE 'no' END
+
+measures:
+  - name: subscribers
+    expression: COUNT(*)
+    format_d3: ",.0f"
+  - name: in_list_a
+    display_name: In list A
+    expression: COUNT(*) FILTER (WHERE in_list_a)
+    format_d3: ",.0f"
+  - name: in_list_b
+    display_name: In list B
+    expression: COUNT(*) FILTER (WHERE in_list_b)
+    format_d3: ",.0f"
+  - name: in_both
+    display_name: In both
+    expression: COUNT(*) FILTER (WHERE in_list_a AND in_list_b)
+    format_d3: ",.0f"
+  - name: list_a_only
+    expression: COUNT(*) FILTER (WHERE in_list_a AND NOT in_list_b)
+    format_d3: ",.0f"
+  - name: list_b_only
+    expression: COUNT(*) FILTER (WHERE in_list_b AND NOT in_list_a)
+    format_d3: ",.0f"
+  - name: list_a_candidates
+    display_name: List-B-only, never on list A
+    description: Candidates to add to list A. Excludes people who unsubscribed from it.
+    expression: COUNT(*) FILTER (WHERE list_a_candidate)
+    format_d3: ",.0f"
+  - name: list_b_only_unsubscribed_list_a
+    display_name: List-B-only, unsubscribed from list A
+    description: Do not re-add these.
+    expression: COUNT(*) FILTER (WHERE in_list_b AND NOT in_list_a AND list_a_subscription = 'unsubscribed')
+    format_d3: ",.0f"
+  - name: list_b_share_in_list_a
+    display_name: Share of list B also in list A
+    expression: COUNT(*) FILTER (WHERE in_list_a AND in_list_b) / NULLIF(COUNT(*) FILTER (WHERE in_list_b), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+  - name: list_a_share_in_list_b
+    display_name: Share of list A also in list B
+    expression: COUNT(*) FILTER (WHERE in_list_a AND in_list_b) / NULLIF(COUNT(*) FILTER (WHERE in_list_a), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+
+explore:
+  display_name: Subscriber Segments
+  defaults:
+    time_range: inf
+    measures:
+      - subscribers
+      - in_both
+      - list_a_only
+      - list_b_only
+    dimensions:
+      - segment
+      - list_a_status
+      - list_b_status

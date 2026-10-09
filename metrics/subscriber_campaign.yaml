@@ -1,0 +1,66 @@
+version: 1
+type: metrics_view
+
+display_name: Time to Open
+description: Per-subscriber open behaviour. Minute-level time from campaign start to first open, early vs later openers.
+model: subscriber_campaign
+timeseries: first_view_at
+smallest_time_grain: minute
+
+dimensions:
+  - name: campaign_label
+    display_name: Campaign
+    column: campaign_label
+  - name: first_open_bucket
+    column: first_open_bucket
+  - name: first_open_minute
+    display_name: Minutes to first open
+    description: Whole minutes from campaign start to the subscriber's first open; 60+ groups everything later.
+    expression: CASE WHEN minutes_to_first_open < 0 THEN '<0' WHEN minutes_to_first_open < 60 THEN lpad(floor(minutes_to_first_open)::INTEGER::VARCHAR, 2, '0') ELSE '60+' END
+  - name: first_open_hour
+    display_name: Hours to first open
+    description: Whole hours from campaign start to the subscriber's first open; 48+ groups everything later.
+    expression: CASE WHEN minutes_to_first_open < 0 THEN '<0' WHEN minutes_to_first_open < 2880 THEN lpad(floor(minutes_to_first_open / 60)::INTEGER::VARCHAR, 2, '0') ELSE '48+' END
+  - name: opener_kind
+    description: early = all views within the early window after campaign start (prefetch or instant open); later = at least one view after the window
+    column: opener_kind
+
+measures:
+  - name: openers
+    expression: COUNT(*) FILTER (WHERE n_views > 0)
+    format_d3: ",.0f"
+  - name: views
+    expression: SUM(n_views)
+    format_d3: ",.0f"
+  - name: multi_view_openers
+    description: Openers with more than one view
+    expression: COUNT(*) FILTER (WHERE n_views > 1)
+    format_d3: ",.0f"
+  - name: clickers
+    expression: COUNT(*) FILTER (WHERE n_clicks > 0)
+    format_d3: ",.0f"
+  - name: views_per_opener
+    expression: SUM(n_views) / NULLIF(COUNT(*) FILTER (WHERE n_views > 0), 0)
+    format_d3: ".2f"
+    valid_percent_of_total: false
+  - name: median_minutes_to_first_open
+    expression: QUANTILE_CONT(minutes_to_first_open, 0.5)
+    format_d3: ",.1f"
+    valid_percent_of_total: false
+  - name: p90_minutes_to_first_open
+    expression: QUANTILE_CONT(minutes_to_first_open, 0.9)
+    format_d3: ",.1f"
+    valid_percent_of_total: false
+
+explore:
+  display_name: Time to Open
+  defaults:
+    time_range: inf
+    measures:
+      - openers
+      - views_per_opener
+      - median_minutes_to_first_open
+    dimensions:
+      - campaign_label
+      - first_open_bucket
+      - opener_kind

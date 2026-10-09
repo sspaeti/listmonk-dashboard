@@ -1,0 +1,62 @@
+# One row per (campaign, subscriber) that opened or clicked: first/last open, open count,
+# minutes from campaign start to first open, first-open bucket, and the early-opener flag.
+# Early = every view happened within early_min minutes of the campaign start (see rill.yaml). This can
+# be a prefetcher (Apple Mail Privacy Protection, scanners) or a person opening a notification right
+# away; it is a sensitivity band, not bot detection.
+type: model
+materialize: true
+
+sql: |
+  WITH v AS (
+    SELECT campaign_id, subscriber_id,
+           min(created_at) AS first_view_at,
+           max(created_at) AS last_view_at,
+           count(*) AS n_views
+    FROM {{ ref "pg_campaign_views" }}
+    WHERE subscriber_id IS NOT NULL
+    GROUP BY 1, 2
+  ),
+  k AS (
+    SELECT campaign_id, subscriber_id,
+           min(created_at) AS first_click_at,
+           count(*) AS n_clicks
+    FROM {{ ref "pg_link_clicks" }}
+    WHERE subscriber_id IS NOT NULL
+    GROUP BY 1, 2
+  ),
+  vk AS (
+    SELECT
+      coalesce(v.campaign_id, k.campaign_id) AS campaign_id,
+      coalesce(v.subscriber_id, k.subscriber_id) AS subscriber_id,
+      v.first_view_at, v.last_view_at, coalesce(v.n_views, 0) AS n_views,
+      k.first_click_at, coalesce(k.n_clicks, 0) AS n_clicks
+    FROM v
+    FULL OUTER JOIN k ON v.campaign_id = k.campaign_id AND v.subscriber_id = k.subscriber_id
+  )
+  SELECT
+    c.campaign_id,
+    c.subject AS campaign_name,
+    c.campaign_label,
+    c.started_at,
+    vk.subscriber_id,
+    vk.first_view_at,
+    vk.last_view_at,
+    vk.n_views,
+    vk.first_click_at,
+    vk.n_clicks,
+    date_diff('second', c.started_at, vk.first_view_at) / 60.0 AS minutes_to_first_open,
+    CASE
+      WHEN vk.first_view_at IS NULL THEN NULL
+      WHEN vk.first_view_at < c.started_at + INTERVAL 2 MINUTE  THEN '0-2 min'
+      WHEN vk.first_view_at < c.started_at + INTERVAL 10 MINUTE THEN '2-10 min'
+      WHEN vk.first_view_at < c.started_at + INTERVAL 60 MINUTE THEN '10-60 min'
+      WHEN vk.first_view_at < c.started_at + INTERVAL 24 HOUR   THEN '1-24 h'
+      ELSE '> 24 h'
+    END AS first_open_bucket,
+    CASE
+      WHEN vk.last_view_at IS NOT NULL
+       AND vk.last_view_at < c.started_at + INTERVAL {{ .env.early_min }} MINUTE THEN 'early'
+      WHEN vk.first_view_at IS NOT NULL THEN 'later'
+    END AS opener_kind
+  FROM vk
+  JOIN {{ ref "sent_campaigns" }} c ON c.campaign_id = vk.campaign_id

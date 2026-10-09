@@ -1,0 +1,39 @@
+# One row per sent *regular* campaign (opt-in confirmation campaigns are excluded): listmonk metadata,
+# target lists, and listmonk's own reported totals. Campaigns are labelled by email subject.
+type: model
+materialize: true
+
+sql: |
+  WITH cl AS (
+    SELECT
+      campaign_id,
+      list(list_name ORDER BY list_name) AS list_names
+    FROM pg_campaign_lists
+    GROUP BY 1
+  )
+  SELECT
+    c.id AS campaign_id,
+    c.subject,
+    c.name AS listmonk_name,
+    strftime(c.started_at, '%Y-%m-%d') || ' · ' || c.subject AS campaign_label,
+    c.status,
+    c.type,
+    coalesce(c.tags, []) AS tags,
+    coalesce(cl.list_names, []) AS list_names,
+    c.started_at,
+    c.send_at,
+    c.created_at,
+    c.updated_at,
+    c.to_send,
+    c.sent,
+    a.api_views,
+    a.api_clicks,
+    a.api_bounces,
+    CASE WHEN c.started_at = max(c.started_at) OVER () THEN 'yes' ELSE 'no' END AS is_latest
+  FROM pg_campaigns c
+  LEFT JOIN cl ON cl.campaign_id = c.id
+  LEFT JOIN api_campaigns a ON a.id = c.id
+  WHERE c.started_at IS NOT NULL
+    AND c.type = 'regular'
+    AND c.sent > 0
+    AND c.status IN ('finished', 'running', 'paused')

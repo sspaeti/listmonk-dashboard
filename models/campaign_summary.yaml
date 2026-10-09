@@ -1,0 +1,98 @@
+# One row per campaign with listmonk's totals, raw-event totals, unique openers/clickers,
+# early vs later openers, Substack-comparable rates and first-open buckets.
+# Rates are NULL (not 0) when a campaign has no per-subscriber tracking data.
+type: model
+materialize: true
+
+sql: |
+  WITH s AS (
+    SELECT
+      campaign_id,
+      count(*) FILTER (WHERE n_views > 0)                     AS unique_openers,
+      count(*) FILTER (WHERE opener_kind = 'early')            AS early_openers,
+      count(*) FILTER (WHERE n_clicks > 0)                    AS unique_clickers,
+      count(*) FILTER (WHERE first_open_bucket = '0-2 min')   AS first_open_0_2m,
+      count(*) FILTER (WHERE first_open_bucket = '2-10 min')  AS first_open_2_10m,
+      count(*) FILTER (WHERE first_open_bucket = '10-60 min') AS first_open_10_60m,
+      count(*) FILTER (WHERE first_open_bucket = '1-24 h')    AS first_open_1_24h,
+      count(*) FILTER (WHERE first_open_bucket = '> 24 h')    AS first_open_24h_plus,
+      quantile_cont(minutes_to_first_open, 0.5)                AS median_minutes_to_first_open
+    FROM subscriber_campaign
+    GROUP BY 1
+  ),
+  raw_views AS (
+    SELECT campaign_id,
+           count(*) AS total_views,
+           count(*) FILTER (WHERE subscriber_id IS NULL) AS anonymous_views
+    FROM pg_campaign_views GROUP BY 1
+  ),
+  -- listmonk's Analytics page counts each subscriber once, on the day of their first view
+  -- (views without subscriber_id form one extra group). Reproduced here for reconciliation.
+  raw_first_opens AS (
+    SELECT campaign_id, count(*) AS raw_first_opens_sum
+    FROM (SELECT campaign_id, subscriber_id, min(created_at) AS first_view
+          FROM pg_campaign_views GROUP BY 1, 2)
+    GROUP BY 1
+  ),
+  raw_clicks AS (
+    SELECT campaign_id, count(*) AS total_clicks FROM pg_link_clicks GROUP BY 1
+  ),
+  raw_bounces AS (
+    SELECT campaign_id,
+           count(*) AS bounces,
+           count(*) FILTER (WHERE type = 'hard') AS hard_bounces
+    FROM pg_bounces GROUP BY 1
+  ),
+  api_daily AS (
+    SELECT campaign_id, sum(count) AS api_daily_views_sum
+    FROM api_daily_activity WHERE type = 'views' GROUP BY 1
+  ),
+  base AS (
+    SELECT
+      c.*,
+      coalesce(rv.total_views, 0)        AS total_views,
+      coalesce(rv.anonymous_views, 0)    AS anonymous_views,
+      coalesce(s.unique_openers, 0)      AS unique_openers,
+      coalesce(s.early_openers, 0)       AS early_openers,
+      coalesce(s.unique_openers, 0) - coalesce(s.early_openers, 0) AS later_openers,
+      coalesce(s.unique_clickers, 0)     AS unique_clickers,
+      coalesce(rc.total_clicks, 0)       AS total_clicks,
+      coalesce(rb.bounces, 0)            AS bounces,
+      coalesce(rb.hard_bounces, 0)       AS hard_bounces,
+      ad.api_daily_views_sum,
+      rfo.raw_first_opens_sum,
+      coalesce(s.first_open_0_2m, 0)     AS first_open_0_2m,
+      coalesce(s.first_open_2_10m, 0)    AS first_open_2_10m,
+      coalesce(s.first_open_10_60m, 0)   AS first_open_10_60m,
+      coalesce(s.first_open_1_24h, 0)    AS first_open_1_24h,
+      coalesce(s.first_open_24h_plus, 0) AS first_open_24h_plus,
+      s.median_minutes_to_first_open
+    FROM sent_campaigns c
+    LEFT JOIN s   ON s.campaign_id   = c.campaign_id
+    LEFT JOIN raw_views rv  ON rv.campaign_id  = c.campaign_id
+    LEFT JOIN raw_first_opens rfo ON rfo.campaign_id = c.campaign_id
+    LEFT JOIN raw_clicks rc ON rc.campaign_id  = c.campaign_id
+    LEFT JOIN raw_bounces rb ON rb.campaign_id = c.campaign_id
+    LEFT JOIN api_daily ad ON ad.campaign_id   = c.campaign_id
+  ),
+  -- Derived columns in a second step: DuckDB binds a bare name to a joined column before a
+  -- same-named alias, which silently broke tracking_status when both lived in one SELECT.
+  flagged AS (
+    SELECT *,
+      CASE
+        WHEN total_views = 0    THEN 'no tracking data'
+        WHEN unique_openers = 0 THEN 'unique n/a'
+        ELSE 'tracked'
+      END AS tracking_status
+    FROM base
+  )
+  SELECT *,
+    CASE WHEN tracking_status = 'tracked'
+          AND started_at = max(CASE WHEN tracking_status = 'tracked' THEN started_at END) OVER ()
+         THEN 'yes' ELSE 'no' END AS is_latest_tracked,
+    CASE WHEN tracking_status = 'tracked' THEN unique_openers / sent END     AS open_rate,
+    CASE WHEN tracking_status = 'tracked' THEN later_openers / sent END      AS open_rate_excl_early,
+    CASE WHEN tracking_status = 'tracked' THEN unique_clickers / sent END    AS click_rate,
+    CASE WHEN unique_openers > 0 THEN unique_clickers / unique_openers END   AS ctor,
+    CASE WHEN unique_openers > 0 THEN total_views / unique_openers END       AS views_per_opener
+  FROM flagged

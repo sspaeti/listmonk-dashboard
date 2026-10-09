@@ -1,0 +1,141 @@
+type: canvas
+display_name: Lists & Subscribers
+max_width: 1400
+
+filters:
+  enable: true
+  pinned:
+    - list_name
+
+defaults:
+  time_range: inf
+  comparison_mode: none
+
+rows:
+  - height: 70px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            # Lists & subscribers
+
+            Who is actually reachable, how lists grow, and how much dead weight sits on them.
+          alignment:
+            horizontal: left
+            vertical: middle
+
+  - height: 150px
+    items:
+      - width: 12
+        kpi_grid:
+          metrics_view: list_health
+          hide_time_range: true
+          measures:
+            - total_subscribers
+            - enabled
+            - blocklisted
+            - dead_weight
+            - dead_weight_share
+
+  - height: 60px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            **Dead weight** = enabled subscribers with no open in the last tracked campaigns (currently only the campaigns with open tracking count, so this is an upper bound).
+          alignment:
+            horizontal: left
+            vertical: middle
+
+  - height: 340px
+    items:
+      - width: 6
+        table:
+          metrics_view: lists
+          title: "Per list"
+          columns:
+            - list_name
+            - subscribers
+            - confirmed_enabled
+            - unconfirmed
+            - unsubscribed
+            - unsubscribe_share
+      - width: 6
+        stacked_bar:
+          metrics_view: lists
+          title: "Subscriptions per list by status"
+          color:
+            field: subscription_status
+            type: nominal
+            legendOrientation: top
+          x:
+            field: list_name
+            type: nominal
+            limit: 10
+            sort: -y
+          y:
+            field: subscribers
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Growth"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 380px
+    items:
+      - width: 6
+        stacked_bar:
+          metrics_view: lists
+          title: "New subscriptions per month by list"
+          time_filters: tr=P24M&grain=month
+          color:
+            field: list_name
+            type: nominal
+            limit: 6
+            legendOrientation: top
+          x:
+            field: subscribed_at
+            type: temporal
+          y:
+            field: subscribers
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        stacked_bar_normalized:
+          metrics_view: lists
+          title: "Of the people who subscribed each month, how many are still confirmed?"
+          description: "Cohort view by subscription month."
+          time_filters: tr=P24M&grain=month
+          color:
+            field: subscription_status
+            type: nominal
+            legendOrientation: top
+          x:
+            field: subscribed_at
+            type: temporal
+          y:
+            field: subscribers
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 380px
+    items:
+      - width: 12
+        line_chart:
+          metrics_view: lists
+          title: "Confirmed & enabled subscriptions gained per month (all lists)"
+          time_filters: tr=inf&grain=month
+          color: primary
+          x:
+            field: subscribed_at
+            type: temporal
+          y:
+            field: confirmed_enabled
+            type: quantitative
+            zeroBasedOrigin: true

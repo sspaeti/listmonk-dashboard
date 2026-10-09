@@ -1,0 +1,204 @@
+type: canvas
+display_name: Campaign Impact (unsubscribes & deliverability)
+max_width: 1400
+
+filters:
+  enable: true
+  pinned:
+    - campaign_label
+    - list_names
+
+defaults:
+  time_range: inf
+  comparison_mode: none
+
+rows:
+  - height: 80px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            # Did this issue hurt the list?
+
+            Unsubscribes within **3 days** after a send on the lists the campaign went to, subscribers blocklisted because this send hard-bounced or got a complaint, plus bounces by type. Works for every campaign, open tracking or not. Rule of thumb: unsubscribe rate below 0.5 % per send is healthy, above 1 % deserves a look.
+          alignment:
+            horizontal: left
+            vertical: middle
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Latest campaign"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 150px
+    items:
+      - width: 12
+        kpi_grid:
+          metrics_view: campaign_impact
+          dimension_filters: is_latest = 'yes'
+          hide_time_range: true
+          measures:
+            - sent
+            - unsubscribes
+            - unsubscribe_rate
+            - hard_bounces
+            - soft_bounces
+            - blocklisted
+            - list_loss_rate
+
+  - height: 420px
+    items:
+      - width: 6
+        line_chart:
+          metrics_view: campaign_impact
+          title: "Unsubscribe rate and hard-bounce rate per send"
+          color:
+            field: rill_measures
+            type: value
+            legendOrientation: top
+          x:
+            field: started_at
+            type: temporal
+          y:
+            field: unsubscribe_rate
+            fields:
+              - unsubscribe_rate
+              - hard_bounce_rate
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        stacked_bar:
+          metrics_view: campaign_impact
+          title: "List loss per campaign: unsubscribes and blocklisted"
+          color:
+            field: rill_measures
+            type: value
+            legendOrientation: top
+          x:
+            field: campaign_label
+            type: nominal
+            limit: 60
+            sort: x
+          y:
+            field: unsubscribes
+            fields:
+              - unsubscribes
+              - blocklisted
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 480px
+    items:
+      - width: 12
+        table:
+          metrics_view: campaign_impact
+          title: "Per campaign"
+          description: "Click a column header to sort. Rates are per mail sent."
+          columns:
+            - campaign_label
+            - sent
+            - unsubscribes
+            - unsubscribe_rate
+            - bounces
+            - hard_bounces
+            - soft_bounces
+            - complaints
+            - bounce_rate
+            - blocklisted
+            - list_loss_rate
+          hide_totals_row: false
+
+  - height: 50px
+    items:
+      - width: 12
+        markdown:
+          content: "## Unsubscribes over time"
+          alignment:
+            horizontal: left
+            vertical: bottom
+
+  - height: 400px
+    items:
+      - width: 6
+        stacked_bar:
+          metrics_view: unsubscribe_events
+          title: "Unsubscribes per month: after a campaign vs organic"
+          time_filters: tr=inf&grain=month
+          color:
+            field: attribution
+            type: nominal
+            legendOrientation: top
+          x:
+            field: unsubscribed_at
+            type: temporal
+          y:
+            field: unsubscribes
+            type: quantitative
+            zeroBasedOrigin: true
+      - width: 6
+        stacked_bar_normalized:
+          metrics_view: unsubscribe_events
+          title: "How long had they been subscribed?"
+          description: "Share of unsubscribes by tenure, per month. Many short tenures = signup expectation mismatch."
+          time_filters: tr=inf&grain=month
+          color:
+            field: tenure_bucket
+            type: nominal
+            legendOrientation: top
+          x:
+            field: unsubscribed_at
+            type: temporal
+          y:
+            field: unsubscribes
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 360px
+    items:
+      - width: 6
+        leaderboard:
+          metrics_view: unsubscribe_events
+          title: "Unsubscribes by campaign and list"
+          dimensions:
+            - attributed_campaign_label
+            - list_name
+            - tenure_bucket
+          measures:
+            - unsubscribes
+            - median_hours_after_send
+            - median_days_subscribed
+          num_rows: 10
+      - width: 6
+        stacked_bar:
+          metrics_view: bounce_events
+          title: "Bounces per month by type"
+          time_filters: tr=inf&grain=month
+          color:
+            field: type
+            type: nominal
+            legendOrientation: top
+          x:
+            field: bounced_at
+            type: temporal
+          y:
+            field: bounces
+            type: quantitative
+            zeroBasedOrigin: true
+
+  - height: 170px
+    items:
+      - width: 12
+        markdown:
+          content: |
+            ### How attribution works
+
+            - An unsubscribe is attributed to the **most recent campaign sent to that list within 3 days before it** (`impact_window_days` in `rill.yaml`). Everything else is *organic*. The unsubscribe time is the list membership's last status change.
+            - *Blocklisted* = subscribers with a hard bounce or complaint on this campaign who are blocklisted now (listmonk's bounce setting: blocklist on the first hard bounce or complaint). Hard bounces are therefore not counted again in list loss.
+            - Bounces come from listmonk's bounce table and are tied to the campaign by listmonk itself.
+          alignment:
+            horizontal: left
+            vertical: top

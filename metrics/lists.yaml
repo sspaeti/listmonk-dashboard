@@ -1,0 +1,56 @@
+version: 1
+type: metrics_view
+
+display_name: Lists & Subscriptions
+description: List memberships by subscription status and subscriber status, over subscription date.
+model: subscriptions
+timeseries: subscribed_at
+
+dimensions:
+  - name: list_name
+    column: list_name
+  - name: list_type
+    column: list_type
+  - name: optin
+    column: optin
+  - name: subscription_status
+    column: subscription_status
+  - name: subscriber_status
+    column: subscriber_status
+
+measures:
+  - name: subscribers
+    display_name: Subscriptions
+    expression: COUNT(*)
+    format_d3: ",.0f"
+  - name: confirmed_enabled
+    display_name: Confirmed & enabled
+    description: Subscriptions that actually receive mail
+    expression: COUNT(*) FILTER (WHERE subscription_status = 'confirmed' AND subscriber_status = 'enabled')
+    format_d3: ",.0f"
+  - name: unsubscribed
+    expression: COUNT(*) FILTER (WHERE subscription_status = 'unsubscribed')
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: unconfirmed
+    expression: COUNT(*) FILTER (WHERE subscription_status = 'unconfirmed')
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: unsubscribe_share
+    expression: COUNT(*) FILTER (WHERE subscription_status = 'unsubscribed') / NULLIF(COUNT(*), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+    lower_is_better: true
+
+explore:
+  display_name: Lists & Subscriptions
+  defaults:
+    time_range: inf
+    measures:
+      - subscribers
+      - confirmed_enabled
+      - unsubscribed
+    dimensions:
+      - list_name
+      - subscription_status
+      - subscriber_status

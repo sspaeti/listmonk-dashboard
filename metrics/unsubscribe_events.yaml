@@ -1,0 +1,49 @@
+version: 1
+type: metrics_view
+
+display_name: Unsubscribes
+description: Every unsubscribe, by time and by whether a campaign preceded it within the attribution window.
+model: unsubscribe_events
+timeseries: unsubscribed_at
+
+dimensions:
+  - name: list_name
+    column: list_name
+  - name: attribution
+    description: after campaign = within the attribution window after a send to that list; organic = no recent send
+    column: attribution
+  - name: attributed_campaign_label
+    display_name: Attributed campaign
+    column: attributed_campaign_label
+  - name: tenure_bucket
+    display_name: Subscribed for
+    expression: CASE WHEN days_subscribed < 7 THEN '0 < 1 week' WHEN days_subscribed < 30 THEN '1 < 1 month' WHEN days_subscribed < 180 THEN '2 1-6 months' WHEN days_subscribed < 365 THEN '3 6-12 months' ELSE '4 > 1 year' END
+
+measures:
+  - name: unsubscribes
+    expression: COUNT(*)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: unsubscribed_subscribers
+    expression: COUNT(DISTINCT subscriber_id)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: median_hours_after_send
+    expression: QUANTILE_CONT(hours_after_send, 0.5)
+    format_d3: ",.0f"
+    valid_percent_of_total: false
+  - name: median_days_subscribed
+    expression: QUANTILE_CONT(days_subscribed, 0.5)
+    format_d3: ",.0f"
+    valid_percent_of_total: false
+
+explore:
+  display_name: Unsubscribes
+  defaults:
+    time_range: inf
+    measures:
+      - unsubscribes
+    dimensions:
+      - attribution
+      - list_name
+      - attributed_campaign_label

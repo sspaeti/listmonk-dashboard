@@ -1,0 +1,46 @@
+# One row per subscriber: current membership in list A and list B (ids in rill.yaml), and the
+# resulting segment. "In" a list = confirmed subscription AND subscriber enabled. The status columns
+# explain why someone is not in a list (never added, unconfirmed, unsubscribed, blocklisted), so
+# unsubscribers are never mistaken for people to add. No personal data.
+type: model
+materialize: true
+
+sql: |
+  WITH s AS (
+    SELECT * FROM {{ ref "subscriptions" }}
+  ),
+  per_sub AS (
+    SELECT
+      subscriber_id,
+      any_value(subscriber_status) AS subscriber_status,
+      max(CASE WHEN list_id = {{ .env.list_a_id }} THEN subscription_status END) AS list_a_subscription,
+      max(CASE WHEN list_id = {{ .env.list_b_id }}       THEN subscription_status END) AS list_b_subscription,
+      min(CASE WHEN list_id = {{ .env.list_a_id }} THEN subscribed_at END)       AS list_a_subscribed_at,
+      min(CASE WHEN list_id = {{ .env.list_b_id }}       THEN subscribed_at END)       AS list_b_subscribed_at,
+      min(subscribed_at) AS first_subscribed_at,
+      count(*) FILTER (WHERE list_id NOT IN ({{ .env.list_a_id }}, {{ .env.list_b_id }})) AS other_lists
+    FROM s
+    GROUP BY 1
+  ),
+  flagged AS (
+    SELECT *,
+      CASE WHEN subscriber_status <> 'enabled' THEN subscriber_status
+           ELSE coalesce(list_a_subscription, 'not on list') END AS list_a_status,
+      CASE WHEN subscriber_status <> 'enabled' THEN subscriber_status
+           ELSE coalesce(list_b_subscription, 'not on list') END AS list_b_status,
+      -- coalesce: a missing list membership is NULL, and NOT NULL would stay NULL (three-valued logic)
+      coalesce(subscriber_status = 'enabled' AND list_a_subscription = 'confirmed', false) AS in_list_a,
+      coalesce(subscriber_status = 'enabled' AND list_b_subscription = 'confirmed', false)       AS in_list_b
+    FROM per_sub
+  )
+  SELECT *,
+    CASE
+      WHEN in_list_a AND in_list_b THEN 'Both lists'
+      WHEN in_list_a                 THEN 'List A only'
+      WHEN in_list_b                 THEN 'List B only'
+      WHEN subscriber_status <> 'enabled' THEN 'Blocklisted / disabled'
+      ELSE 'Neither (unsubscribed or unconfirmed)'
+    END AS segment,
+    -- List-B-only people who were never on list A: the ones you could add. Unsubscribers excluded.
+    in_list_b AND NOT in_list_a AND list_a_subscription IS NULL AS list_a_candidate
+  FROM flagged

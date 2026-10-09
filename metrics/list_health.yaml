@@ -1,0 +1,47 @@
+version: 1
+type: metrics_view
+
+display_name: List Health
+description: Snapshot of subscriber statuses and dead weight (enabled subscribers with no open in the last tracked campaigns).
+model: list_health
+
+dimensions:
+  - name: snapshot
+    expression: snapshot_at::VARCHAR
+
+measures:
+  - name: total_subscribers
+    expression: SUM(total_subscribers)
+    format_d3: ",.0f"
+  - name: enabled
+    expression: SUM(enabled)
+    format_d3: ",.0f"
+  - name: disabled
+    expression: SUM(disabled)
+    format_d3: ",.0f"
+  - name: blocklisted
+    expression: SUM(blocklisted)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: dead_weight
+    display_name: Dead weight (no open)
+    description: Enabled subscribers with no open in the last 10 campaigns that have tracking data.
+    expression: SUM(dead_weight)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: dead_weight_no_view_no_click
+    display_name: Dead weight (no open, no click)
+    expression: SUM(dead_weight_no_view_no_click)
+    format_d3: ",.0f"
+    lower_is_better: true
+  - name: dead_weight_share
+    expression: SUM(dead_weight) / NULLIF(SUM(enabled), 0)
+    format_preset: percentage
+    valid_percent_of_total: false
+    lower_is_better: true
+  - name: tracked_campaigns_considered
+    expression: MAX(tracked_campaigns_considered)
+    format_d3: ",.0f"
+
+explore:
+  skip: true

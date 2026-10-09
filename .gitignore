@@ -1,0 +1,10 @@
+.env
+data/*
+!data/.gitkeep
+tmp/
+.rillcloud/
+.DS_Store
+.claude/settings.local.json
+.claude/skills
+evidence/.evidence/
+evidence/connection.yaml

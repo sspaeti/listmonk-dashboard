@@ -1,0 +1,13 @@
+project:
+  name: "listmonk-dashboard"
+  evidence: "0.10.1"
+
+pages: ./pages
+
+layout:
+  page_width: full
+  cards: true
+
+# Random id so Evidence can count deployments of this project, not people. Remove to opt out: https://docs.evidence.studio/cli#telemetry
+telemetry:
+  id: "bb2062f1-f2e0-4ab1-9e48-85e68456fe18"
